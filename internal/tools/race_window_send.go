@@ -21,7 +21,7 @@ import (
 // RaceRequestInput is a single raw HTTP/1.1 request to send across the barrier.
 type RaceRequestInput struct {
 	Label string `json:"label,omitempty" jsonschema:"Identifier for this request in results (e.g. attempt-1)"`
-	Raw   string `json:"raw" jsonschema:"required,Raw HTTP/1.1 request"`
+	Raw   string `json:"raw" jsonschema:"required,Raw HTTP/1.1 request. Header lines are normalized to CRLF; the body after the first blank line is sent byte-for-byte."`
 }
 
 // RaceWindowSendInput is the input for the race_window_send tool.

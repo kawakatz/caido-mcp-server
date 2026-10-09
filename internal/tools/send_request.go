@@ -18,7 +18,7 @@ import (
 
 // SendRequestInput is the input for the send_request tool
 type SendRequestInput struct {
-	Raw          string `json:"raw" jsonschema:"required,Raw HTTP request including headers and body"`
+	Raw          string `json:"raw" jsonschema:"required,Raw HTTP request including headers and body. Header lines are normalized to CRLF; the body after the first blank line is sent byte-for-byte, so use CRLF inside it where the protocol requires it."`
 	Host         string `json:"host,omitempty" jsonschema:"Target host (overrides Host header)"`
 	Port         int    `json:"port,omitempty" jsonschema:"Target port (default based on TLS)"`
 	TLS          *bool  `json:"tls,omitempty" jsonschema:"Use HTTPS (default true)"`

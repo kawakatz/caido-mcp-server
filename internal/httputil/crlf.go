@@ -2,6 +2,11 @@ package httputil
 
 import "strings"
 
+// NormalizeCRLF rewrites the request line and header lines of a raw
+// HTTP request to CRLF line endings and terminates the header block with
+// a blank line. The body, everything after the first blank line, is
+// returned byte-for-byte: rewriting it would corrupt binary uploads and
+// multipart parts and break the request's Content-Length.
 func NormalizeCRLF(raw string) string {
 	// Only interpret literal \r\n escapes when the input has no real CR
 	// or LF bytes. This supports CLI usage where users type \r\n
@@ -11,16 +16,21 @@ func NormalizeCRLF(raw string) string {
 	if !strings.ContainsRune(raw, '\r') && !strings.ContainsRune(raw, '\n') {
 		raw = strings.ReplaceAll(raw, `\r\n`, "\r\n")
 	}
-	raw = strings.ReplaceAll(raw, "\r\n", "\n")
-	raw = strings.ReplaceAll(raw, "\n", "\r\n")
-	if !strings.HasSuffix(raw, "\r\n\r\n") {
-		if strings.HasSuffix(raw, "\r\n") {
-			raw += "\r\n"
-		} else {
-			raw += "\r\n\r\n"
+	var lines []string
+	for {
+		line, rest, found := strings.Cut(raw, "\n")
+		line = strings.TrimSuffix(line, "\r")
+		if found && line == "" && len(lines) > 0 {
+			return strings.Join(lines, "\r\n") + "\r\n\r\n" + rest
 		}
+		if line != "" {
+			lines = append(lines, line)
+		}
+		if !found {
+			return strings.Join(lines, "\r\n") + "\r\n\r\n"
+		}
+		raw = rest
 	}
-	return raw
 }
 
 func ParseHostHeader(raw string) string {

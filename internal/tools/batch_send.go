@@ -24,7 +24,7 @@ type BatchSendInput struct {
 // BatchRequestItem is a single request in the batch.
 type BatchRequestItem struct {
 	Label     string `json:"label" jsonschema:"required,Identifier for this request in results (e.g. owner, cross, noauth, val-1)"`
-	Raw       string `json:"raw" jsonschema:"required,Full raw HTTP request including headers and body"`
+	Raw       string `json:"raw" jsonschema:"required,Full raw HTTP request including headers and body. Header lines are normalized to CRLF; the body after the first blank line is sent byte-for-byte."`
 	Host      string `json:"host,omitempty" jsonschema:"Target host (overrides Host header)"`
 	Port      int    `json:"port,omitempty" jsonschema:"Target port (default based on TLS)"`
 	TLS       *bool  `json:"tls,omitempty" jsonschema:"Use HTTPS (default true)"`

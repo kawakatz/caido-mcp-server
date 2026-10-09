@@ -53,6 +53,42 @@ func TestNormalizeCRLF_SingleTrailingCRLF(t *testing.T) {
 	}
 }
 
+func TestNormalizeCRLF_BodyBytesArePreserved(t *testing.T) {
+	body := "--b\r\nContent-Type: image/png\r\n\r\n\x89PNG\r\n\x1a\n\x00\x00\n--b--"
+	input := "POST /upload HTTP/1.1\nHost: example.com\nContent-Length: 47\n\n" + body
+	got := NormalizeCRLF(input)
+	want := "POST /upload HTTP/1.1\r\nHost: example.com\r\nContent-Length: 47\r\n\r\n" + body
+	if got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestNormalizeCRLF_BodyGetsNoTrailingTerminator(t *testing.T) {
+	input := "POST / HTTP/1.1\r\nHost: example.com\r\nContent-Length: 3\r\n\r\na=1"
+	got := NormalizeCRLF(input)
+	if got != input {
+		t.Fatalf("got %q, want %q", got, input)
+	}
+}
+
+func TestNormalizeCRLF_MixedHeaderLineEndings(t *testing.T) {
+	input := "POST / HTTP/1.1\r\nHost: example.com\nContent-Length: 4\r\n\na\nb\n"
+	got := NormalizeCRLF(input)
+	want := "POST / HTTP/1.1\r\nHost: example.com\r\nContent-Length: 4\r\n\r\na\nb\n"
+	if got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestNormalizeCRLF_LeadingBlankLineIsNotTheSeparator(t *testing.T) {
+	input := "\r\nGET / HTTP/1.1\r\nHost: example.com\r\n\r\n"
+	got := NormalizeCRLF(input)
+	want := "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"
+	if got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
 func TestParseHostHeader_Found(t *testing.T) {
 	raw := "GET / HTTP/1.1\nHost: example.com\nAccept: */*\n"
 	got := ParseHostHeader(raw)
