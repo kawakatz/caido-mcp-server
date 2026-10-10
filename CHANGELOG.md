@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **`caido_batch_send` returns each result's Caido `requestId`.** Like `caido_send_request`, every batch result now carries the ID of the recorded request, so a caller can cite or re-read the exact request a batch sent instead of guessing it from history.
+
 ### Fixed
 - **Raw request bodies are sent byte-for-byte.** `NormalizeCRLF` rewrote every bare LF in the whole raw request to CRLF and appended a blank line after the body. That corrupted binary uploads and multipart parts and made the body longer than its `Content-Length`, which left stray bytes on the connection. It now normalizes only the request line and header lines, terminates the header block, and leaves everything after the first blank line untouched. Affects `caido_send_request`, `caido_edit_request`, `caido_batch_send`, `caido_race_window_send`, and the CLI raw sender.
 

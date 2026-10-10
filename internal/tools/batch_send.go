@@ -37,6 +37,7 @@ type BatchRequestItem struct {
 // object; internal/replay's wire shape is not owned by this tool.
 type BatchSendResult struct {
 	Label       string                  `json:"label"`
+	RequestID   string                  `json:"requestId,omitempty"`
 	StatusCode  int                     `json:"statusCode,omitempty"`
 	RoundtripMs int                     `json:"roundtripMs,omitempty"`
 	Request     *httputil.ParsedMessage `json:"request,omitempty"`
@@ -136,6 +137,7 @@ func batchSendHandler(
 
 			item := BatchSendResult{
 				Label:       r.Label,
+				RequestID:   r.RequestID,
 				StatusCode:  r.StatusCode,
 				RoundtripMs: r.RoundtripMs,
 				Request:     r.Request,
@@ -185,7 +187,7 @@ func RegisterBatchSendTool(
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "caido_batch_send",
 		Title:       "Batch Send Requests",
-		Description: `Send multiple HTTP requests in parallel (max 50). Use for BAC token sweeps, parameter fuzzing, or endpoint sweeps. Returns statusCode, headers, and a response fingerprint per request; body text omitted by default (includeBody:true to include). marker flags reflection per result. Set sessionId per request to auto-inject and persist session cookies. See README "Response fingerprinting" for field details.`,
+		Description: `Send multiple HTTP requests in parallel (max 50). Use for BAC token sweeps, parameter fuzzing, or endpoint sweeps. Returns the Caido requestId, statusCode, headers, and a response fingerprint per request; body text omitted by default (includeBody:true to include). marker flags reflection per result. Set sessionId per request to auto-inject and persist session cookies. See README "Response fingerprinting" for field details.`,
 		InputSchema: schemaFor[BatchSendInput](func(s *jsonschema.Schema) {
 			if p := prop(s, "requests"); p != nil {
 				p.MaxItems = intPtr(50)

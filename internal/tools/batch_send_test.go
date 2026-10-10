@@ -147,6 +147,9 @@ func TestBatchSendFingerprintExpansion(t *testing.T) {
 			t.Fatalf("want 1 result, got %d", len(output.Results))
 		}
 		r := output.Results[0]
+		if r.RequestID != "br-fp" {
+			t.Fatalf("want requestId %q, got %q", "br-fp", r.RequestID)
+		}
 		if r.Response == nil {
 			t.Fatalf("expected a response")
 		}

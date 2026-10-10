@@ -26,6 +26,7 @@ type BatchRequest struct {
 // BatchResult is the result of a single request in a batch.
 type BatchResult struct {
 	Label       string                  `json:"label"`
+	RequestID   string                  `json:"requestId,omitempty"`
 	StatusCode  int                     `json:"statusCode,omitempty"`
 	RoundtripMs int                     `json:"roundtripMs,omitempty"`
 	Request     *httputil.ParsedMessage `json:"request,omitempty"`
@@ -180,6 +181,7 @@ func executeSingle(
 	}
 
 	if entry.Request != nil {
+		result.RequestID = entry.Request.ID
 		result.Request = httputil.ParseBase64(
 			entry.Request.Raw, true, false, 0, 0,
 		)
