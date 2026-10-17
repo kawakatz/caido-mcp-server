@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"slices"
 	"time"
@@ -32,6 +33,7 @@ type GetRequestOutput struct {
 	RoundtripMs int                     `json:"roundtripMs,omitempty"`
 	CreatedAt   string                  `json:"createdAt,omitempty"`
 	Request     *httputil.ParsedMessage `json:"request,omitempty"`
+	Raw         string                  `json:"raw,omitempty"`
 	Response    *httputil.ParsedMessage `json:"response,omitempty"`
 	Error       string                  `json:"error,omitempty"`
 }
@@ -51,6 +53,7 @@ func shouldInclude(include []string, field string) bool {
 func includeRequiresRaw(include []string) bool {
 	return shouldInclude(include, "requestHeaders") ||
 		shouldInclude(include, "requestBody") ||
+		shouldInclude(include, "raw") ||
 		shouldInclude(include, "responseHeaders") ||
 		shouldInclude(include, "responseBody")
 }
@@ -193,6 +196,14 @@ func processFullRequest(
 		)
 	}
 
+	if shouldInclude(include, "raw") {
+		if decoded, err := base64.StdEncoding.DecodeString(r.Raw); err == nil {
+			output.Raw = base64.StdEncoding.EncodeToString(
+				[]byte(httputil.RedactRawHeaders(string(decoded))),
+			)
+		}
+	}
+
 	if r.Response != nil {
 		inclRespH := shouldInclude(include, "responseHeaders")
 		inclRespB := shouldInclude(include, "responseBody")
@@ -214,7 +225,7 @@ func RegisterGetRequestTool(
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "caido_get_request",
 		Title:       "Get Request",
-		Description: `Get request details. Default: metadata only (saves tokens). Use include=[requestHeaders,requestBody,responseHeaders,responseBody] for more. Body limit: 2KB default.`,
+		Description: `Get request details. Default: metadata only (saves tokens). Use include=[requestHeaders,requestBody,responseHeaders,responseBody] for more (add metadata to keep host/port/isTls); include=raw returns the exact request bytes base64-encoded in raw (no body limit; sensitive header values are redacted unless CAIDO_ALLOW_SENSITIVE_HEADERS is set). Body limit: 2KB default.`,
 		Annotations: readOnlyAnn(),
 	}, getRequestHandler(client))
 }

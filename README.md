@@ -208,7 +208,7 @@ you use it, so upgrading does not require a fresh login.
 | `caido_diff_responses` | Structural diff of two responses by Caido request ID: status/size change flags and a compact body/header summary (never dumps full bodies) |
 | `caido_send_request` | Send HTTP request via Replay, returns response inline. Polls up to 10s. Auto-injects session cookies and persists `Set-Cookie` (toggle with `useCookieJar`) |
 | `caido_batch_send` | Send multiple requests in parallel (BAC sweeps, parameter fuzzing, endpoint sweeps). Max 50 per batch |
-| `caido_edit_request` | Modify and resend an existing request. Preserves auth/cookies while changing method, path, headers, or body |
+| `caido_edit_request` | Modify and resend an existing request, by `requestId` or from exact raw bytes in `rawFile` (with `host`). Preserves auth/cookies while changing method, path, headers, or body |
 | `caido_export_curl` | Convert a request to an executable curl command for PoC reports |
 | `caido_create_replay_session` | Create a named replay session, optionally seed with a request |
 | `caido_list_replay_sessions` | List replay sessions |
@@ -300,7 +300,7 @@ Read-only data exposed via the MCP resources protocol. Agents can read these wit
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `ids` | string[] | Request IDs (required) |
-| `include` | string[] | `requestHeaders`, `requestBody`, `responseHeaders`, `responseBody` |
+| `include` | string[] | `metadata` (default when omitted), `requestHeaders`, `requestBody`, `responseHeaders`, `responseBody`, `raw` (exact request bytes, base64, in `raw`; sensitive header values redacted unless `CAIDO_ALLOW_SENSITIVE_HEADERS` is set) |
 | `bodyOffset` | int | Byte offset |
 | `bodyLimit` | int | Byte limit (default 2000) |
 

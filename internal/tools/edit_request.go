@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"net"
+	"os"
 	"strconv"
 	"strings"
 
@@ -14,15 +16,16 @@ import (
 )
 
 type EditRequestInput struct {
-	RequestID     string            `json:"requestId" jsonschema:"required,Source request ID to modify"`
+	RequestID     string            `json:"requestId,omitempty" jsonschema:"Source request ID to modify (required unless rawFile is set)"`
+	RawFile       string            `json:"rawFile,omitempty" jsonschema:"Absolute path to a file holding the exact raw HTTP/1.x request bytes to modify instead of requestId (requires host)"`
 	Method        string            `json:"method,omitempty" jsonschema:"Override HTTP method"`
 	Path          string            `json:"path,omitempty" jsonschema:"Override request path"`
 	SetHeaders    map[string]string `json:"setHeaders,omitempty" jsonschema:"Headers to add or replace"`
 	RemoveHeaders []string          `json:"removeHeaders,omitempty" jsonschema:"Headers to remove"`
 	Body          string            `json:"body,omitempty" jsonschema:"Override request body"`
-	Host          string            `json:"host,omitempty" jsonschema:"Override target host"`
+	Host          string            `json:"host,omitempty" jsonschema:"Override target host or host:port (required with rawFile)"`
 	Port          int               `json:"port,omitempty" jsonschema:"Override target port"`
-	TLS           *bool             `json:"tls,omitempty" jsonschema:"Override TLS setting"`
+	TLS           *bool             `json:"tls,omitempty" jsonschema:"Override TLS setting (default true with rawFile)"`
 	SessionID     string            `json:"sessionId,omitempty" jsonschema:"Replay session ID"`
 	BodyLimit     int               `json:"bodyLimit,omitempty" jsonschema:"Response body byte limit (default 2000)"`
 	BodyOffset    int               `json:"bodyOffset,omitempty" jsonschema:"Response body byte offset (default 0)"`
@@ -125,23 +128,37 @@ func editRequestHandler(
 		req *mcp.CallToolRequest,
 		input EditRequestInput,
 	) (*mcp.CallToolResult, SendRequestOutput, error) {
-		if input.RequestID == "" {
-			return nil, SendRequestOutput{}, fmt.Errorf("requestId is required")
+		if (input.RequestID == "") == (input.RawFile == "") {
+			return nil, SendRequestOutput{}, fmt.Errorf("exactly one of requestId or rawFile is required")
 		}
 
-		resp, err := client.Requests.Get(ctx, input.RequestID)
-		if err != nil {
-			return nil, SendRequestOutput{}, fmt.Errorf("failed to get request: %w", err)
-		}
+		var decoded []byte
+		host, port, useTLS := "", 0, true
+		if input.RawFile != "" {
+			if input.Host == "" {
+				return nil, SendRequestOutput{}, fmt.Errorf("host is required with rawFile")
+			}
+			data, err := os.ReadFile(input.RawFile)
+			if err != nil {
+				return nil, SendRequestOutput{}, fmt.Errorf("failed to read rawFile: %w", err)
+			}
+			decoded = data
+		} else {
+			resp, err := client.Requests.Get(ctx, input.RequestID)
+			if err != nil {
+				return nil, SendRequestOutput{}, fmt.Errorf("failed to get request: %w", err)
+			}
 
-		r := resp.Request
-		if r == nil {
-			return nil, SendRequestOutput{}, fmt.Errorf("request not found")
-		}
+			r := resp.Request
+			if r == nil {
+				return nil, SendRequestOutput{}, fmt.Errorf("request not found")
+			}
 
-		decoded, err := base64.StdEncoding.DecodeString(r.Raw)
-		if err != nil {
-			return nil, SendRequestOutput{}, fmt.Errorf("failed to decode raw request: %w", err)
+			decoded, err = base64.StdEncoding.DecodeString(r.Raw)
+			if err != nil {
+				return nil, SendRequestOutput{}, fmt.Errorf("failed to decode raw request: %w", err)
+			}
+			host, port, useTLS = r.Host, r.Port, r.IsTls
 		}
 
 		raw := httputil.NormalizeCRLF(string(decoded))
@@ -169,17 +186,19 @@ func editRequestHandler(
 			raw = replaceBody(raw, input.Body)
 		}
 
-		host := r.Host
 		if input.Host != "" {
 			host = input.Host
+			if h, p, err := net.SplitHostPort(host); err == nil {
+				if pv, convErr := strconv.Atoi(p); convErr == nil {
+					host, port = h, pv
+				}
+			}
 		}
 
-		port := r.Port
 		if input.Port != 0 {
 			port = input.Port
 		}
 
-		useTLS := r.IsTls
 		if input.TLS != nil {
 			useTLS = *input.TLS
 		}
@@ -270,7 +289,7 @@ func RegisterEditRequestTool(
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "caido_edit_request",
 		Title:       "Edit Request",
-		Description: `Modify and resend an existing request. Fetches original request, applies modifications (method, path, headers, body), preserves auth/cookies, and sends the modified request. Returns same output as send_request.`,
+		Description: `Modify and resend an existing request. Fetches original request by requestId, or reads its exact raw bytes from rawFile (e.g. get_request include=[raw,metadata] from another Caido instance, base64-decoded; set host, port, tls), applies modifications (method, path, headers, body), preserves auth/cookies and all other bytes, and sends the modified request. Returns same output as send_request.`,
 		Annotations: writeAnn(false, false, true),
 	}, editRequestHandler(client))
 }

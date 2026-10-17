@@ -1,6 +1,8 @@
 package tools_test
 
 import (
+	"encoding/base64"
+	"strings"
 	"testing"
 
 	"github.com/c0tton-fluff/caido-mcp-server/v4/internal/testutil"
@@ -322,5 +324,46 @@ func TestGetRequest_BodyOffsetAndLimit(t *testing.T) {
 	// We're just verifying the parameters are passed through correctly
 	if output.Response.Body == "" {
 		t.Errorf("expected response body to be populated")
+	}
+}
+
+func TestGetRequest_IncludeRaw(t *testing.T) {
+	raw := "POST /upload HTTP/1.1\r\nHost: example.com\r\nCookie: sid=abc\r\nContent-Length: 12\r\n\r\n" +
+		"\x89PNG\r\n\x1a\n\x00\xff\xfe\n"
+	tests := []struct {
+		name  string
+		allow string
+		want  string
+	}{
+		{name: "exact bytes with sensitive headers allowed", allow: "true", want: raw},
+		{name: "sensitive headers redacted by default", allow: "", want: strings.Replace(raw, "sid=abc", "[REDACTED]", 1)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("CAIDO_ALLOW_SENSITIVE_HEADERS", tt.allow)
+			env := testutil.NewMCPTestEnv(t, func(server *mcp.Server, client *caido.Client) {
+				tools.RegisterGetRequestTool(server, client)
+			})
+			fixture := testutil.GetRequestFullResponse("req-raw", "ok")
+			fixture["request"].(map[string]any)["raw"] = base64.StdEncoding.EncodeToString([]byte(raw))
+			env.Mock.On("GetRequest", fixture)
+
+			result := env.CallTool(t, "caido_get_request", map[string]any{
+				"ids":     []string{"req-raw"},
+				"include": []string{"raw"},
+			})
+			output := testutil.UnmarshalToolResult[tools.GetRequestOutput](t, result)
+
+			got, err := base64.StdEncoding.DecodeString(output.Raw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got) != tt.want {
+				t.Errorf("raw = %q, want %q", got, tt.want)
+			}
+			if output.Request != nil || output.Response != nil {
+				t.Errorf("expected only raw, got request %v response %v", output.Request, output.Response)
+			}
+		})
 	}
 }
