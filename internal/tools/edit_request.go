@@ -255,10 +255,6 @@ func editRequestHandler(
 					diff := httputil.GlobalResponseCache().GetAndSet(sessionID, digest)
 					if diff != nil {
 						output.Diff = diff
-						if diff.Same {
-							output.Response.Body = ""
-							output.Response.Headers = nil
-						}
 					}
 				}
 			}
